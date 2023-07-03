@@ -1,0 +1,160 @@
+import json
+import os
+import random
+
+class Quiz():
+    def __init__(self, topic_id, compiled_data, questions):
+        self.topic_id = topic_id
+        self.compiled_data = compiled_data
+        self.questions = questions
+        self.questions_to_ask = compiled_data[topic_id]['question-IDS']
+
+        random.shuffle(self.questions_to_ask)
+    def run_quiz(self):
+        score = 0
+        size = min(10, len(self.questions_to_ask))
+        for index in range(size):
+            current_question = self.questions.get(self.questions_to_ask[index])
+            clear()
+            # The ask_question function runs and returns True/False for a(n) correct/incorrect answer, if correct increase the score
+            if ask_question(current_question, index + 1, size):
+                score += 1
+            input('enter any key to continue ')
+        return score, size
+
+def open_json_files(*file_names):
+    opened_files=[]
+    for file in file_names:
+        with open(file) as fileobj:
+            opening=json.load(fileobj)
+            opened_files.append(opening)
+    return opened_files
+
+def read_json_files(questions,topics,past_scores):
+    compiled_data={}
+    for items,values in topics.items():
+        compiled_data[items]={'topic':values}
+    compiled_data[str(len(compiled_data)+1)]={'topic':'all'}
+    for data_item,data_value in compiled_data.items():
+        data_value['question-IDS']=[]
+        if data_value['topic'] !='all':
+            for key,value in questions.items():
+                if data_value['topic'] in value['topics']:
+                    data_value['question-IDS'].append(key)
+        else:
+            for key,value in questions.items():
+                data_value['question-IDS'].append(key)
+        data_value['no_of_questions']=len(data_value['question-IDS'])
+        data_value['past_score']=past_scores.get(data_item)
+    return compiled_data
+
+def welcome_page(compiled_data):
+    titles=['topics','Number of questions','Past Scores']
+    max_length=len(max(titles,key=len))
+    for values in compiled_data.values():
+        if len(values['topic'])+4>max_length:
+            max_length=len(values['topic']+4)
+    # Printing the table:
+    print('Welcome to your Python Learning App!\n')
+    print('Select a topic to review and you will be asked a max of 10 questions per run. Good luck!\n')
+    print('-'*(max_length*3+10))
+    print('| {0:^{max_length}} | {1:^{max_length}} | {2:^{max_length}} |'.format(
+        titles[0].title(),
+        titles[1].title(),
+        titles[2].title(),
+        max_length=max_length)
+    )
+    print('-'*(max_length*3+10))
+    for key,values in compiled_data.items():
+            print('| {0:<{max_length}} | {1:^{max_length}} | {2:^{max_length}} |'.format(
+        f'{key}.{values["topic"].title()}',
+        values['no_of_questions'],
+        values['past_score'] or 'None',
+        max_length=max_length)
+    )
+    print('-'*(max_length*3+10))
+
+def clear():
+    if os.name=='nt':
+        arg='cls'
+    else:
+        arg='clear'
+    os.system(arg)
+
+def valid_inputs(promt,valid_options,Exit_value='Q'):
+    user_input=input(promt)
+    if user_input==Exit_value:
+        raise SystemExit
+    elif user_input not in valid_options:
+        user_input = input(f'Please enter a valid option or \'{Exit_value}\' to quit: ')
+    else:
+        return user_input
+
+def ask_question(question,question_number, total_questions):
+    
+    #get options from questions
+    options = []
+    for option in question['options'].values():
+        options.append(option)
+    random.shuffle(options) #randomize the options
+
+    #print the options:
+    letters=['a','b','c','d','e','f','g']
+    shuffled_options={}
+    index=0
+    for option in options:
+        shuffled_options[letters[index]]=option
+        index+=1
+    
+    #question promt and options;
+    print(f'- ({question_number} / {total_questions}) {question["question"]}')
+    for letter,quest in shuffled_options.items():
+        print(f'\t{letter}. {quest}')
+
+    #Get correct answer:
+    correct_answer=question['options'][question['answer']]
+
+    user_input=valid_inputs('Enter your answer (\'Q\' to quit): ', list(shuffled_options.keys()))
+    user_answer=shuffled_options[user_input]
+
+    if user_answer==correct_answer:
+        print(f'That\'s Correct!')
+        return True
+    else:
+        print(f'That\'s Incorrect!')
+        return False
+
+def main():
+    while True:
+        questions_file = 'questions.json'
+        topics_file = 'topics.json'
+        past_scores_file = 'past_scores.json'
+        questions, topics, past_scores = open_json_files(questions_file, topics_file, past_scores_file)
+        compiled_data = read_json_files(questions, topics, past_scores)
+        clear()
+
+        welcome_page(compiled_data)
+
+        topic_id = valid_inputs('\nEnter the number of the topic you want to review (\'Q\' to quit): ', list(compiled_data.keys()))
+
+        chosen_quiz = Quiz(topic_id, compiled_data, questions)
+        score, size = chosen_quiz.run_quiz()
+        
+        clear()
+
+        final_score = int(100 * score / size) #Finding final score
+        past_scores[topic_id] = str(final_score) + '%' #updating past_scores
+        with open('past_scores.json', 'w') as file_object:
+            json.dump(past_scores, file_object) #write paste_scores into json file\
+        
+
+
+        print(f'You scored {final_score}%')
+
+        loop = input('Enter \'y\' to run the app again, any other key to quit: ')
+        if loop != 'y':
+            clear()
+            break
+
+if __name__=='__main__':
+    main()
